@@ -5,6 +5,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from .serializers import UserRegistrationSerializer, UserLoginSerializer
 from .models import User
+from django.core.mail import send_mail
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -24,6 +25,11 @@ class UserRegistrationView(APIView):
             serializer.save()
             token=RefreshToken.for_user(serializer.instance)
             link=reverse('verify', args=[str(token.access_token)],request=request)
+            subject="Welcome to fundoo notes"
+            message=f"Hi {serializer.data['first_name']} {serializer.data['last_name']}, thank you for registering.\n Click:\n{link}"
+            from_email='vinitbhamare2002@gmail.com'
+            to_email=serializer.data['email']
+            send_mail(subject, message, from_email, [to_email])
             return Response({'message': 'Registration successful','data':{'refresh': str(token), 'access': str(token.access_token), 'link': link,'data':serializer.data}}, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
