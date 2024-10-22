@@ -6,7 +6,7 @@ class Book(models.Model):
     author = models.CharField(max_length=255, null=False, db_index=True)
     description = models.TextField(null=True, blank=True)
     price = models.PositiveIntegerField(null=False, db_index=True)
-    stock=models.PositiveIntegerField(null=False, default=0)
+    stock=models.PositiveIntegerField(null=False)#remove
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='book')
 
     class Meta:

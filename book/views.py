@@ -8,45 +8,93 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import NotFound, ValidationError,PermissionDenied
 from django.core.exceptions import PermissionDenied
 from rest_framework.decorators import action
+from drf_yasg.utils import swagger_auto_schema
 
 class BookViewSet(viewsets.ModelViewSet):
-    queryset = Book.objects.all()  # Fetch all books
+    queryset = Book.objects.all() 
     serializer_class = BookSerializer
-    permission_classes = [IsAuthenticated]  # JWT token required for all actions
+    permission_classes = [IsAuthenticated]  
 
     # 1. List all books (only accessible by authenticated users)
+    # @swagger_auto_schema(
+    #         operation_description="Get all books",request_body=BookSerializer, 
+    #         responses={
+    #             201: BookSerializer,
+    #             400: "Bad Request: Invalid input data.",
+    #             403: "Forbidden: Only authenticated users can view books.",
+    #             500: "Internal Server Error: An error occurred during Adding Book"})
     def list(self, request, *args, **kwargs):
         """
         List all books. Only authenticated users can view books.
         """
-        books = self.queryset  # Get all books
-        serializer = self.get_serializer(books, many=True)  # Serialize all book records
-        return Response(serializer.data, status=status.HTTP_200_OK)
-    
+        try:
+            books = self.queryset
+            serializer = self.get_serializer(books, many=True) 
+            # return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response({
+                "message": "Notes retrieved successfully.",
+                "data": serializer.data
+            }, status=status.HTTP_200_OK)
+        except PermissionError as e:
+            return Response({
+                "error": "Permission denied.",
+                "detail": f"You do not have the required permissions to view this resource, {str(e)}"
+            }, status=status.HTTP_403_FORBIDDEN)
+        except Exception as e:
+            # logger.error(f"Error in list method: {e}")
+            return Response({
+                "error": "An error occurred while retrieving notes.",
+                "detail": str(e)
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+
+    @swagger_auto_schema(
+            operation_description="Add a new book",request_body=BookSerializer, 
+            responses={
+                201: BookSerializer,
+                400: "Bad Request: Invalid input data.",
+                403: "Forbidden: Only superusers can create books.",
+                500: "Internal Server Error: An error occurred during Adding Book"})
     def create(self, request, *args, **kwargs):
         """
         Only superusers are allowed to create books.
         Save the book with the logged-in superuser as the owner.
         """
-        if not request.user.is_superuser:  # Check if the user is a superuser
-            raise PermissionDenied("Only superusers can create books.")
-        
-        # Proceed with saving the book with the superuser as the owner
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        serializer.save(user=request.user)  # Automatically set the user as the book creator
-        headers = self.get_success_headers(serializer.data)
-        
-        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+        try:
+            if not request.user.is_superuser: 
+                raise PermissionDenied("Only superusers can create books.")
+            
+            serializer = self.get_serializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            serializer.save(user=request.user)
+            headers = self.get_success_headers(serializer.data)
+            return Response({
+                "message": "Note created successfully.",
+                "data": serializer.data
+            }, status=status.HTTP_201_CREATED, headers=headers)
+            # return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+        except PermissionError as e:
+            return Response({
+                "error": "Permission denied.",
+                "detail": f"You do not have the required permissions to to add new book, {str(e)}"
+            }, status=status.HTTP_403_FORBIDDEN)
+        except ValidationError as e:
+            return Response({
+                "error": "Invalid data.",
+                "detail": str(e)
+            }, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            # logger.error(f"Error in create method: {e}")
+            return Response({
+                "error": "An error occurred while creating the note.",
+                "detail": str(e)
+            }, status=status.HTTP_400_BAD_REQUEST)
+
     def retrieve(self, request, pk=None, *args, **kwargs):
         try:
-            # Fetch the book instance by its primary key (ID)
             instance = self.get_object()
-            
-            # Serialize the book instance
             serializer = self.get_serializer(instance)
             
-            # Return the response with the book data and a custom message
             return Response({
                 'user': request.user.email,
                 'message': 'Book retrieved successfully.',
@@ -54,25 +102,40 @@ class BookViewSet(viewsets.ModelViewSet):
             }, status=status.HTTP_200_OK)
 
         except NotFound:
-            # Return a 404 response if the book is not found
             return Response({
                 'user': request.user.email,
                 'error': 'Book not found.',
                 'detail': 'The book with the provided ID does not exist.'
             }, status=status.HTTP_404_NOT_FOUND)
-
+        except PermissionError as e:
+            return Response({
+                "error": "Permission denied.",
+                "detail": f"You do not have the required permissions to to get this book, {str(e)}"
+            }, status=status.HTTP_403_FORBIDDEN)
+        except ValidationError as e:
+            return Response({
+                "error": "Invalid data.",
+                "detail": str(e)
+            }, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
-            # Return a 400 response for any other exception
             return Response({
                 'user': request.user.email,
                 'error': 'An error occurred while retrieving the book.',
                 'detail': str(e)
             }, status=status.HTTP_400_BAD_REQUEST)
-
+        
+    @swagger_auto_schema(
+            operation_description="Add a new book",request_body=BookSerializer, 
+            responses={
+                201: BookSerializer,
+                400: "Bad Request: Invalid input data.",
+                403: "Forbidden: Permission denied.",
+                404: "Not Found: The book with the provided ID does not exist.",
+                500: "Internal Server Error: An error occurred during updating Book"})
     def update(self, request, pk=None, *args, **kwargs):
         partial = False
         try:
-            if not request.user.is_superuser:  # Check if the user is a superuser
+            if not request.user.is_superuser:
                 raise PermissionDenied("Only superusers can create books.")
             instance = self.get_object()
             serializer = self.get_serializer(instance, data=request.data, partial=partial)
@@ -111,11 +174,19 @@ class BookViewSet(viewsets.ModelViewSet):
                 'error': 'An error occurred while updating the note.',
                 'detail': str(e)
             }, status=status.HTTP_400_BAD_REQUEST)
-        
+    
+    @swagger_auto_schema(
+            operation_description="Add a new book",request_body=BookSerializer, 
+            responses={
+                201: BookSerializer,
+                400: "Bad Request: Invalid input data.",
+                403: "Forbidden: Permission denied.",
+                404: "Not Found: The book with the provided ID does not exist.",
+                500: "Internal Server Error: An error occurred during updating Book"})
     def partial_update(self, request, pk=None, *args, **kwargs):
         partial = True
         try:
-            if not request.user.is_superuser:  # Check if the user is a superuser
+            if not request.user.is_superuser: 
                 raise PermissionDenied("Only superusers can create books.")
             instance = self.get_object()
             serializer = self.get_serializer(instance, data=request.data, partial=partial)
@@ -151,10 +222,18 @@ class BookViewSet(viewsets.ModelViewSet):
                 'error': 'An error occurred while partially updating the note.',
                 'detail': str(e)
             }, status=status.HTTP_400_BAD_REQUEST)
-        
+    
+    @swagger_auto_schema(
+            operation_description="Add a new book",request_body=BookSerializer, 
+            responses={
+                204: BookSerializer,
+                400: "Bad Request: An error occurred while deleting the book.",
+                403: "Forbidden: Permission denied.",
+                404: "Not Found: The book with the provided ID does not exist.",
+                500: "Internal Server Error: An unexpected error occurred."})
     def destroy(self, request, pk=None, *args, **kwargs):
         try:
-            if not request.user.is_superuser:  # Check if the user is a superuser
+            if not request.user.is_superuser: 
                 raise PermissionDenied("Only superusers can create books.")
             instance = self.get_object()
             self.perform_destroy(instance)

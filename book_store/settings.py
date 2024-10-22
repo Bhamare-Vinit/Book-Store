@@ -47,7 +47,15 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'user',
     'book',
+    'cart',
+    'drf_yasg',
+    # 'corsheaders',
 ]
+# CORS_ALLOWED_ORIGINS = [
+#     "http://localhost:3000",
+# ]
+
+# CORS_ALLOW_ALL_ORIGINS = True
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -191,3 +199,9 @@ EMAIL_HOST_PASSWORD = os.environ.get('pass')
 EMAIL_PORT = os.environ.get('port')
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_USE_TLS = True
+
+
+SWAGGER_SETTINGS = {
+    "USE_SESSION_AUTH": False,
+    "SECURITY_DEFINITIONS": {"Bearer": {"type": "apiKey", "name": "Authorization", "in": "header"}},
+}
