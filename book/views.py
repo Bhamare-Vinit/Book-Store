@@ -37,6 +37,11 @@ class BookViewSet(viewsets.ModelViewSet):
             }, status=status.HTTP_200_OK)
         except PermissionError as e:
             return Response({
+                "error": "Unauthorized.",
+                "detail": str(e)
+            }, status=status.HTTP_401_UNAUTHORIZED)
+        except PermissionError as e:
+            return Response({
                 "error": "Permission denied.",
                 "detail": f"You do not have the required permissions to view this resource, {str(e)}"
             }, status=status.HTTP_403_FORBIDDEN)
@@ -62,7 +67,11 @@ class BookViewSet(viewsets.ModelViewSet):
         """
         try:
             if not request.user.is_superuser: 
-                raise PermissionDenied("Only superusers can create books.")
+                # raise PermissionDenied("Only superusers can create books.")
+                return Response({
+                    "error": "Permission denied.",
+                    "detail": "Only superusers can create books."
+                },status=status.HTTP_403_FORBIDDEN)
             
             serializer = self.get_serializer(data=request.data)
             serializer.is_valid(raise_exception=True)

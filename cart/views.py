@@ -9,6 +9,7 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework import status
 from drf_yasg.utils import swagger_auto_schema
+from django.db import transaction
 
 class CartViewSet(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
@@ -69,6 +70,12 @@ class CartViewSet(viewsets.ViewSet):
 
         if not book_id or not quantity:
             raise ValidationError("Both 'book_id' and 'quantity' are required.")
+        try:
+            quantity = int(quantity)
+            if quantity <= 0:
+                raise ValidationError("Quantity must be a positive integer.")
+        except ValueError:
+            raise ValidationError("Quantity must be a valid integer.")
 
         try:
             book = Book.objects.get(id=book_id)
@@ -79,14 +86,18 @@ class CartViewSet(viewsets.ViewSet):
             }, status=status.HTTP_404_NOT_FOUND)
 
         try:
-            cart_item, created = CartItem.objects.get_or_create(cart=cart, book=book)
+            with transaction.atomic():
+                cart_item, created = CartItem.objects.get_or_create(cart=cart, book=book)
 
-            cart_item.price = book.price*quantity  
-            cart_item.quantity = quantity
-            cart_item.save()
-            cart.total_quantity = sum(item.quantity for item in cart.items.all())
-            cart.total_price = sum(item.quantity * item.price for item in cart.items.all())
-            cart.save()
+                # Update price and quantity
+                cart_item.price = book.price * quantity
+                cart_item.quantity = quantity
+                cart_item.save()
+
+                # Recalculate cart totals
+                cart.total_quantity = sum(item.quantity for item in cart.items.all())
+                cart.total_price = sum(item.price for item in cart.items.all())  # item.price is already price * quantity
+                cart.save()
 
             return Response({
                 "message": "Cart updated successfully.",

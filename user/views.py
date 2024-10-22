@@ -87,8 +87,8 @@ class UserLoginView(APIView):
                 # user = authenticate(request, email=serializer.validated_data['email'], password=serializer.validated_data['password'])
                 # if user:
             user=serializer.save()
-            # if not user.is_verified:
-            #     return Response({"error": "User is not verified. Please verify your email to log in."}, status=status.HTTP_403_FORBIDDEN)
+            if not user.is_verified:
+                return Response({"error": "User is not verified. Please verify your email to log in."}, status=status.HTTP_403_FORBIDDEN)
             token=RefreshToken.for_user(serializer.instance)
             # return Response({'message': 'Login successful','data':{'refresh': str(token), 'access': str(token.access_token)}}, status=status.HTTP_200_OK)
             user_data = {
